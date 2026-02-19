@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-client'
 import Header from '@/components/Header'
@@ -9,10 +9,14 @@ import Link from 'next/link'
 export default function ProfilePage() {
   const router = useRouter()
   const supabase = createClient()
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const [stats, setStats] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [uploading, setUploading] = useState(false)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -26,6 +30,7 @@ export default function ProfilePage() {
         .eq('id', user.id)
         .single()
       setProfile(profileData)
+      if (profileData?.avatar_url) setAvatarUrl(profileData.avatar_url)
 
       const { data: statsData } = await supabase
         .from('user_stats')
@@ -38,6 +43,61 @@ export default function ProfilePage() {
     }
     load()
   }, [])
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !user) return
+
+    // Validate size (1MB)
+    if (file.size > 1048576) {
+      alert('ไฟล์ใหญ่เกินไป (สูงสุด 1MB)')
+      return
+    }
+
+    // Validate type
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      alert('รองรับเฉพาะไฟล์ JPG, PNG, WEBP')
+      return
+    }
+
+    setUploading(true)
+
+    const fileExt = file.name.split('.').pop()
+    const filePath = `${user.id}/avatar.${fileExt}`
+
+    // Upload to Supabase Storage
+    const { error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(filePath, file, { upsert: true })
+
+    if (uploadError) {
+      alert('อัพโหลดไม่สำเร็จ: ' + uploadError.message)
+      setUploading(false)
+      return
+    }
+
+    // Get public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('avatars')
+      .getPublicUrl(filePath)
+
+    // Add cache buster
+    const urlWithCacheBuster = `${publicUrl}?t=${Date.now()}`
+
+    // Update user profile
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({ avatar_url: urlWithCacheBuster })
+      .eq('id', user.id)
+
+    if (updateError) {
+      alert('อัปเดตโปรไฟล์ไม่สำเร็จ: ' + updateError.message)
+    } else {
+      setAvatarUrl(urlWithCacheBuster)
+    }
+
+    setUploading(false)
+  }
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -91,7 +151,43 @@ export default function ProfilePage() {
       <div className="p-4 space-y-4">
         {/* Profile Card */}
         <div className="bg-white rounded-2xl p-6 shadow-sm text-center">
-          <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center text-3xl mx-auto mb-3">🏃</div>
+          {/* Avatar with upload */}
+          <div className="relative inline-block mb-3">
+            <div 
+              onClick={() => fileInputRef.current?.click()}
+              className="w-24 h-24 rounded-full overflow-hidden bg-blue-50 flex items-center justify-center cursor-pointer group relative"
+            >
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="avatar" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-4xl">🏃</span>
+              )}
+              {/* Hover overlay */}
+              <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition rounded-full">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </div>
+            </div>
+            {uploading && (
+              <div className="absolute inset-0 bg-white/80 rounded-full flex items-center justify-center">
+                <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
+            {/* Camera badge */}
+            <button 
+              onClick={() => fileInputRef.current?.click()}
+              className="absolute -bottom-1 -right-1 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center shadow-lg border-2 border-white hover:bg-blue-700 transition"
+            >
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </button>
+            <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={handleAvatarUpload} className="hidden" />
+          </div>
+
           <h2 className="text-lg font-bold text-gray-800">{displayName}</h2>
           <p className="text-gray-400 text-xs">{user.email}</p>
           <p className="text-gray-300 text-[10px] mt-0.5">สมาชิกตั้งแต่ {memberSince}</p>
