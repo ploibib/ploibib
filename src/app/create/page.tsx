@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase-client'
 import Header from '@/components/Header'
@@ -8,7 +8,15 @@ import Header from '@/components/Header'
 const SHIRT_SIZES = ['XXS', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL']
 const DEFAULT_DISTANCES = ['5K', '10K', '21.1K', '42.2K']
 
-export default function CreateListingPage() {
+export default function CreateListingWrapper() {
+  return (
+    <Suspense fallback={<div className="pb-24"><Header title="ลงบิบ" showBack /><div className="p-4 text-center py-16 text-gray-400">กำลังโหลด...</div></div>}>
+      <CreateListingPage />
+    </Suspense>
+  )
+}
+
+function CreateListingPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
