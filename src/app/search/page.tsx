@@ -181,17 +181,11 @@ export default function SearchPage() {
                       )}
                     </div>
 
-                    {/* Action buttons */}
+                    {/* Action button → goes to offer page */}
                     {l.type === 'sell' && (
-                      <Link href={`/create?event=${ev?.id || l.event_id}&distance=${encodeURIComponent(l.distance)}&type=buy`}
+                      <Link href={`/offer/${l.id}`}
                         className="block w-full mt-3 py-2.5 text-center bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition shadow-sm shadow-blue-600/20">
-                        สนใจ — ตั้งรับบิบนี้
-                      </Link>
-                    )}
-                    {l.type === 'buy' && (
-                      <Link href={`/create?event=${ev?.id || l.event_id}&distance=${encodeURIComponent(l.distance)}&type=sell`}
-                        className="block w-full mt-3 py-2.5 text-center bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition shadow-sm shadow-emerald-600/20">
-                        มีบิบนี้ — ปล่อยบิบ
+                        {l.price_mode === 'open' ? `สนใจซื้อ ฿${l.asking_price?.toLocaleString()}` : 'สนใจ — ยื่นข้อเสนอ'}
                       </Link>
                     )}
                   </div>
